@@ -312,7 +312,7 @@ async function query_user_balance() {
 }
 
 function total_shares(){
-    let TOTAL_USERS = shares.length;
+    let TOTAL_USERS = 0;
     let TOTAL_SHARES_TO_MINT = 0;
     for( let i in shares ){
         const share_data = shares[i].split(',');
