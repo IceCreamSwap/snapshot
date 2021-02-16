@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "start": "nodemon ./index.js"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "data/*",
+      "docs/*"
+    ]
+  },
+  "dependencies": {
+    "bignumber.js": "^9.0.1",
+    "web3": "^1.3.4"
+  }
+}
