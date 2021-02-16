@@ -1,7 +1,7 @@
 const Web3 = require('web3');
 const fs = require('fs');
 const BigNumber = require('bignumber.js')
-      BigNumber.config({ DECIMAL_PLACES: 0 });
+BigNumber.config({DECIMAL_PLACES: 0});
 
 const http_options = {
     keepAlive: true,
@@ -24,14 +24,20 @@ const MilkShake = '0x8Cf93F2b41bA17F9189Aa7a86576f2764A442eca';
 
 const user_db = './data/users.json';
 let users = file_get(user_db);
-    users = users ? JSON.parse(users) : [];
+users = users ? JSON.parse(users) : [];
 
-const shares_db = './data/shares.txt';
-let shares = file_get(shares_db);
+const shares_db = './data/shares.json';
+let shares_details = file_get(shares_db);
+if( shares_details ) {
+    shares_details = JSON.parse(shares_details);
+}
+
+const shares_txt = './data/shares.txt';
+let shares = file_get(shares_txt);
     shares = shares ? shares.split('\n') : [];
 
-
 let exclude = [
+    '0x000000000000000000000000000000000000dEaD',
     '0x44dc6Fcc4716234ef04efF8BE41cD73F34733Cb2',
     '0x792a46f30f1F6208b24C8199C3F2403f2Df06637',
     '0xDF260692756Dd4fffe84c15A9E71fEFB648c4aeA',
@@ -69,7 +75,8 @@ async function save_users() {
 
 async function save_shares() {
     console.log(` -- shares saved: ${shares.length}`);
-    file_save(shares_db, shares.join('\n'));
+    file_save(shares_txt, shares.join('\n'));
+    file_save(shares_db, JSON.stringify(shares_unique));
 }
 
 // iCreamToken
@@ -108,7 +115,8 @@ function file_save(file, str) {
     }
     return false;
 }
-function d(v){
+
+function d(v) {
     return new Number(web3.utils.fromWei(v, 'ether')).toFixed(4);
 }
 
@@ -141,7 +149,6 @@ async function find_all_users() {
 }
 
 
-
 const MasterChef = '0x78Bd56CA4D781d1Be3808a7AF0A8b5446048c1AC';
 const masterchef_abi = require('./abi/MasterChef.json');
 const masterchef_ctx = new web3.eth.Contract(masterchef_abi, MasterChef);
@@ -152,7 +159,8 @@ const pid_bnb = 7;
 const pid_busd = 8;
 
 let shares_unique = {};
-function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icream, bnb_lp, busd_icream, busd_lp ){
+
+function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icream, bnb_lp, busd_icream, busd_lp) {
 
     const token_str = parseFloat(d(token));
     const pool_icream_str = parseFloat(d(pool_icream));
@@ -164,16 +172,16 @@ function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icrea
 
     const share = (token_str + pool_icream_str + pool_lp_str + bnb_icream_str + bnb_lp_str + busd_icream_str + busd_lp_str).toFixed(0);
 
-    if( share == 0 ){
+    if (share == 0) {
         // no shares
         return;
     }
 
-    const share_wei = web3.utils.toWei( new BigNumber(share).toString(), 'ether');
+    const share_wei = web3.utils.toWei(new BigNumber(share).toString(), 'ether');
 
     // use this if you want to rebuild shares.json
     shares_unique[addr] = {
-        'share': share,
+        'share': parseFloat(share),
         'token': token_str,
         'pool_icream': pool_icream_str,
         'pool_lp': pool_lp_str,
@@ -184,11 +192,13 @@ function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icrea
         'share_wei': share_wei
     }
 
-    // addr,share as seems that JSON.parser only parse first 2k results from shares.json
-    shares.push( addr+','+share );
+    // console.log(shares_unique[addr]);
 
-    const pct = Number((i/total)*100).toFixed(2);
-    console.log(i, '(',pct,'%)', addr, share);
+    // addr,share as seems that JSON.parser only parse first 2k results from shares.json
+    shares.push(addr + ',' + share);
+
+    const pct = Number((i / total) * 100).toFixed(2);
+    console.log(i, '(', pct, '%)', addr, share);
 
 }
 
@@ -196,7 +206,7 @@ function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icrea
 async function query_masterchef_balance(steep, i, addr) {
 
     // excluded address like pools, dev, treasure, etc:
-    if( exclude[addr] ) return;
+    if (exclude[addr]) return;
 
     const token = await iCreamTokenBalance(addr);
     const pool_icream = await iCreamPendingPoolBalance(pid_icream, addr);
@@ -209,34 +219,35 @@ async function query_masterchef_balance(steep, i, addr) {
     const busd_lp = await iCreamLpPoolBalance(pid_busd, addr);
 
     try {
-        await process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icream, bnb_lp, busd_icream, busd_lp );
+        await process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icream, bnb_lp, busd_icream, busd_lp);
     } catch (e) {
         console.error(e);
-        console.log("**ERROR** addr="+addr+" i="+i, e.toString());
-        console.log('pool_icream', pool_icream.toString() );
-        console.log('pool_lp', pool_lp.toString() );
-        console.log('bnb_icream', bnb_icream.toString() );
-        console.log('bnb_lp', bnb_lp.toString() );
-        console.log('busd_icream', busd_icream.toString() );
-        console.log('busd_lp', busd_lp.toString() );
+        console.log("**ERROR** addr=" + addr + " i=" + i, e.toString());
+        console.log('pool_icream', pool_icream.toString());
+        console.log('pool_lp', pool_lp.toString());
+        console.log('bnb_icream', bnb_icream.toString());
+        console.log('bnb_lp', bnb_lp.toString());
+        console.log('busd_icream', busd_icream.toString());
+        console.log('busd_lp', busd_lp.toString());
         process.exit(1);
     }
 }
 
 // 3) get user balance staked at pid=0 iCreamPool and pending
-async function iCreamPendingPoolBalance( pid, addr ){
-    return await masterchef_ctx.methods.pendingCream(pid, addr).call({from: addr}, SNAPSHOT_BLOCK);;
+async function iCreamPendingPoolBalance(pid, addr) {
+    return await masterchef_ctx.methods.pendingCream(pid, addr).call({from: addr}, SNAPSHOT_BLOCK);
+    ;
 }
 
 // 2) get user balance from iCream Pool (deposited)
-async function iCreamLpPoolBalance( pid, addr ){
+async function iCreamLpPoolBalance(pid, addr) {
     const result = await masterchef_ctx.methods.userInfo(pid, addr).call({from: addr}, SNAPSHOT_BLOCK);
     let value_wei = result.amount;
     return uniswapRemoveLiquidity(pid, value_wei); // convert LP to iCream
 }
 
 // 1) get user balance from iCream BEP20 Token
-async function iCreamTokenBalance( addr ){
+async function iCreamTokenBalance(addr) {
     return await CreamToken_ctx.methods.balanceOf(addr).call({from: addr}, SNAPSHOT_BLOCK);
 }
 
@@ -250,17 +261,16 @@ let uniswap_reserves_busd0 = 41008.1435;    //
 let uniswap_reserves_busd1 = 334137.4002;   //
 
 
-
-function uniswapRemoveLiquidity( pid, value_wei ){
+function uniswapRemoveLiquidity(pid, value_wei) {
 
     //to decimal or get weird conversions errors
     let rec = new Number(web3.utils.fromWei(value_wei, 'ether')).toFixed(4);
     // We consider only iCream share, then multiply by * to avoid price conversion issues:
     // (pair1 liquidity * balance / totalSupply)*2
-    if( pid == 7 )
-        rec = (uniswap_reserves_bnb1*rec/uniswap_totalSupply_bnb)*2;
-    if( pid == 8 ) {
-        rec = (uniswap_reserves_busd0*rec/uniswap_totalSupply_busd)*2;
+    if (pid == 7)
+        rec = (uniswap_reserves_bnb0 * rec / uniswap_totalSupply_bnb) * 2;
+    if (pid == 8) {
+        rec = (uniswap_reserves_busd0 * rec / uniswap_totalSupply_busd) * 2;
     }
 
     const share = Number(rec).toFixed(4);
@@ -277,8 +287,8 @@ const UniswapV2Pair_ABI = require('./abi/UniswapV2Pair.json');
 const icream_addr = '0x58f651DDE51CAa87c4111B16ee0A6Fab061Ee564';
 const bnb_addr = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
 const busd_addr = '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56';
-const bnb_iclp_token =  '0x792a46f30f1F6208b24C8199C3F2403f2Df06637';
-const busd_iclp_token =  '0x44dc6Fcc4716234ef04efF8BE41cD73F34733Cb2';
+const bnb_iclp_token = '0x792a46f30f1F6208b24C8199C3F2403f2Df06637';
+const busd_iclp_token = '0x44dc6Fcc4716234ef04efF8BE41cD73F34733Cb2';
 // 0x58f651DDE51CAa87c4111B16ee0A6Fab061Ee564 iCream
 // 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c WBNB
 
@@ -286,21 +296,21 @@ const busd_iclp_token =  '0x44dc6Fcc4716234ef04efF8BE41cD73F34733Cb2';
 let busd_iclp_ctx;
 let uniswap_liquidity_busd;
 const total = users.length;
+
 async function query_user_balance() {
-    //users = ['0xD88B7140dFD33ffb9e39B13914F9AACc67cC5a38']; // testcase
+    //users = ['0xD9794A703e38DA995b4fB950DB4FA42660ee6bC2']; // testcase
     let steep = 0;
     for (let i in users) {
         const addr = users[i];
-        if( exclude.indexOf(addr) !== -1 )
+        if (exclude.indexOf(addr) !== -1)
             continue;
-        if( shares_unique[addr] ){
-            console.log('found', addr, shares_unique[addr] );
+        if (shares_unique[addr]) {
+            console.log('found', addr, shares_unique[addr]);
             return;
         }
-        if( steep == 1000 ){
-            steep =  0;
+        if (steep == 1000) {
+            steep = 0;
             save_shares();
-            //process.exit(0);
         }
         await query_masterchef_balance(steep, i, addr);
         steep++;
@@ -311,10 +321,10 @@ async function query_user_balance() {
 
 }
 
-function total_shares(){
+function total_shares() {
     let TOTAL_USERS = 0;
     let TOTAL_SHARES_TO_MINT = 0;
-    for( let i in shares ){
+    for (let i in shares) {
         const share_data = shares[i].split(',');
         const addr = share_data[0];
         const share = parseFloat(share_data[1]);
@@ -333,7 +343,7 @@ function total_shares(){
 // step 2:
 // Now that we have the list of users, let query balances
 // and build shares
-//query_user_balance();
+// query_user_balance();
 
 // step 3:
 // Test the share database just printing the amount of share needed.
