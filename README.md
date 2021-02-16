@@ -2,6 +2,11 @@
 
 Script and snapshot of user balance data.
 
+# Stats
+
+```TOTAL_SHARES_TO_MINT 497821 
+USERS 2559```
+
 # Files
 
 - users.json: contains a list of all users that received iCream.
