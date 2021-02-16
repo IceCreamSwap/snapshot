@@ -4,8 +4,8 @@ Script and snapshot of user balance data.
 
 # Stats
 
-```TOTAL_SHARES_TO_MINT 497821 
-USERS 2559```
+`TOTAL_SHARES_TO_MINT 497821`
+`USERS 2559`
 
 # Files
 
