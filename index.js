@@ -343,8 +343,8 @@ function total_shares() {
 // step 2:
 // Now that we have the list of users, let query balances
 // and build shares
-// query_user_balance();
+query_user_balance();
 
 // step 3:
 // Test the share database just printing the amount of share needed.
-total_shares();
+// total_shares();

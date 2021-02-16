@@ -8,6 +8,8 @@ iCreamRecovery Shares: `906266`
 
 Affected users: `3283`
 
+Snapshot block: `4793585`
+
 # Files
 
 - users.json: contains a list of all users that received iCream.
