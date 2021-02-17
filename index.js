@@ -38,7 +38,6 @@ let shares = file_get(shares_txt);
     shares = shares ? shares.split('\n') : [];
 
 let exclude = [
-    '0x5909947Bace5Eb03280F3B9D198ce9Db26d94492',
     '0x000000000000000000000000000000000000dEaD',
     '0x44dc6Fcc4716234ef04efF8BE41cD73F34733Cb2',
     '0x792a46f30f1F6208b24C8199C3F2403f2Df06637',
