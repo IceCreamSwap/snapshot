@@ -4,9 +4,9 @@ Script and snapshot of user balance data.
 
 # Stats
 
-iCreamRecovery Shares: `906266`
+iCreamRecovery Shares: `653297`
 
-Affected users: `3283`
+Affected users: `2612`
 
 Snapshot block: `4793585`
 

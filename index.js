@@ -1,3 +1,4 @@
+
 const Web3 = require('web3');
 const fs = require('fs');
 const BigNumber = require('bignumber.js')
@@ -37,6 +38,7 @@ let shares = file_get(shares_txt);
     shares = shares ? shares.split('\n') : [];
 
 let exclude = [
+    '0x5909947Bace5Eb03280F3B9D198ce9Db26d94492',
     '0x000000000000000000000000000000000000dEaD',
     '0x44dc6Fcc4716234ef04efF8BE41cD73F34733Cb2',
     '0x792a46f30f1F6208b24C8199C3F2403f2Df06637',
@@ -120,9 +122,13 @@ function d(v) {
     return new Number(web3.utils.fromWei(v, 'ether')).toFixed(4);
 }
 
-const CreamToken = '0x58f651DDE51CAa87c4111B16ee0A6Fab061Ee564'; // cake example
+const CreamToken = '0x58f651DDE51CAa87c4111B16ee0A6Fab061Ee564';
 const CreamToken_abi = require('./abi/CreamToken.json');
 const CreamToken_ctx = new web3.eth.Contract(CreamToken_abi, CreamToken);
+
+const SmartChef = '0x3c69a4889e20519d41a76e1bb29cf8fa6d545720';
+const SmartChef_abi = require('./abi/SmartChef.json');
+const SmartChef_ctx = new web3.eth.Contract(SmartChef_abi, SmartChef);
 
 async function save_users_from_iCreamToken(from, to) {
     await query_event(CreamToken_ctx, 'Transfer', from, to,
@@ -160,7 +166,7 @@ const pid_busd = 8;
 
 let shares_unique = {};
 
-function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icream, bnb_lp, busd_icream, busd_lp) {
+function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icream, bnb_lp, busd_icream, busd_lp, token_bnb, user_query) {
 
     const token_str = parseFloat(d(token));
     const pool_icream_str = parseFloat(d(pool_icream));
@@ -169,10 +175,11 @@ function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icrea
     const bnb_lp_str = parseFloat(bnb_lp);
     const busd_icream_str = parseFloat(d(busd_icream));
     const busd_lp_str = parseFloat(busd_lp);
+    const token_bnb_str = parseFloat(token_bnb);
 
-    const share = (token_str + pool_icream_str + pool_lp_str + bnb_icream_str + bnb_lp_str + busd_icream_str + busd_lp_str).toFixed(0);
+    const share = (token_str + pool_icream_str + pool_lp_str + bnb_icream_str + bnb_lp_str + busd_icream_str + busd_lp_str + token_bnb_str).toFixed(0);
 
-    if (share == 0) {
+    if (!user_query && share == 0) {
         // no shares
         return;
     }
@@ -189,26 +196,31 @@ function process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icrea
         'bnb_lp': bnb_lp_str,
         'busd_icream': busd_icream_str,
         'busd_lp': busd_lp_str,
+        'ibnb_lp': token_bnb_str,
         'share_wei': share_wei
     }
 
-    // console.log(shares_unique[addr]);
+    if( user_query )
+        console.log(shares_unique[addr]);
 
     // addr,share as seems that JSON.parser only parse first 2k results from shares.json
     shares.push(addr + ',' + share);
 
     const pct = Number((i / total) * 100).toFixed(2);
-    console.log(i, '(', pct, '%)', addr, share);
+    console.log(`${i} (${pct}%) ${addr}=${share}`);
 
 }
 
+
 // main function to query iCream balance by address on all 3 affected pools:
-async function query_masterchef_balance(steep, i, addr) {
+async function query_masterchef_balance(steep, i, addr, user_query) {
 
     // excluded address like pools, dev, treasure, etc:
-    if (exclude[addr]) return;
+    if (exclude[addr])
+        return;
 
     const token = await iCreamTokenBalance(addr);
+    const token_bnb = await iCreamBnbPoolBalance(addr);
     const pool_icream = await iCreamPendingPoolBalance(pid_icream, addr);
     const pool_lp = await iCreamLpPoolBalance(pid_icream, addr);
 
@@ -219,7 +231,7 @@ async function query_masterchef_balance(steep, i, addr) {
     const busd_lp = await iCreamLpPoolBalance(pid_busd, addr);
 
     try {
-        await process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icream, bnb_lp, busd_icream, busd_lp);
+        await process_balances(steep, i, addr, token, pool_icream, pool_lp, bnb_icream, bnb_lp, busd_icream, busd_lp, token_bnb, user_query);
     } catch (e) {
         console.error(e);
         console.log("**ERROR** addr=" + addr + " i=" + i, e.toString());
@@ -231,6 +243,14 @@ async function query_masterchef_balance(steep, i, addr) {
         console.log('busd_lp', busd_lp.toString());
         process.exit(1);
     }
+}
+
+// 4) get user balance from iCream BNB Pool
+async function iCreamBnbPoolBalance(addr) {
+    const result = await SmartChef_ctx.methods.userInfo(addr).call({from: addr}, SNAPSHOT_BLOCK);
+    let value_wei = result.amount;
+    let rec = new Number(web3.utils.fromWei(value_wei, 'ether')).toFixed(4);
+    return Number(rec).toFixed(4);
 }
 
 // 3) get user balance staked at pid=0 iCreamPool and pending
@@ -297,7 +317,11 @@ let busd_iclp_ctx;
 let uniswap_liquidity_busd;
 const total = users.length;
 
-async function query_user_balance() {
+async function query_user_balance( query_this ) {
+    if( query_this ){
+        await query_masterchef_balance(0, 0, query_this, query_this);
+        return;
+    }
     //users = ['0xD9794A703e38DA995b4fB950DB4FA42660ee6bC2']; // testcase
     let steep = 0;
     for (let i in users) {
@@ -343,7 +367,7 @@ function total_shares() {
 // step 2:
 // Now that we have the list of users, let query balances
 // and build shares
-query_user_balance();
+query_user_balance(); // 0x5909947Bace5Eb03280F3B9D198ce9Db26d94492
 
 // step 3:
 // Test the share database just printing the amount of share needed.
